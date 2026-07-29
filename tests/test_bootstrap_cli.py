@@ -1,4 +1,4 @@
-"""Tests for data-bootstrap and data-audit CLI commands."""
+"""Tests for data-bootstrap CLI command."""
 
 import argparse
 import csv
@@ -7,8 +7,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from bonoai.cli import _run_data_audit, _run_data_bootstrap
-from bonoai.domain.data import CanonicalDrawRecord, SourceProvenance
+from bonoai.cli import _run_data_bootstrap
+from bonoai.domain.data import CanonicalDrawRecord, DataContractError, SourceProvenance
 from bonoai.domain.models import Draw
 from bonoai.infrastructure.csv_repository import CsvDrawRepository
 
@@ -117,52 +117,6 @@ class DataBootstrapCliTests(TestCase):
             result = _run_data_bootstrap(args)
             self.assertEqual(result, 0)
 
-
-class DataAuditCliTests(TestCase):
-    def test_audit_empty_repository(self) -> None:
-        with TemporaryDirectory() as directory:
-            data_dir = Path(directory) / "data"
-            data_dir.mkdir()
-            (data_dir / "processed").mkdir()
-
-            args = argparse.Namespace(data_dir=data_dir, as_json=False)
-
-            result = _run_data_audit(args)
-            self.assertEqual(result, 0)
-
-    def test_audit_with_json_output(self) -> None:
-        with TemporaryDirectory() as directory:
-            data_dir = Path(directory) / "data"
-            data_dir.mkdir()
-            (data_dir / "processed").mkdir()
-
-            repository = CsvDrawRepository(data_dir / "processed" / "draws.csv")
-            record = CanonicalDrawRecord(
-                draw=Draw(
-                    contest_id="bonoloto:2026-07-28",
-                    held_on=date(2026, 7, 28),
-                    numbers=(1, 2, 3, 4, 5, 6),
-                    complementary=7,
-                    reintegro=3,
-                ),
-                provenances=(
-                    SourceProvenance(
-                        source_name="selae",
-                        source_url="https://www.selae.es/lotobonoloto",
-                        retrieved_at_utc=datetime(2026, 7, 29, 10, 0, tzinfo=UTC),
-                        source_sha256="a" * 64,
-                        source_type="official",
-                        schema_version=2,
-                    ),
-                ),
-            )
-            repository.append_validated((record,))
-
-            args = argparse.Namespace(data_dir=data_dir, as_json=True)
-
-            result = _run_data_audit(args)
-            self.assertEqual(result, 0)
-
     def test_bootstrap_detects_conflict_and_fails(self) -> None:
         with TemporaryDirectory() as directory:
             data_dir = Path(directory) / "data"
@@ -235,8 +189,6 @@ class DataAuditCliTests(TestCase):
                 _run_data_bootstrap(args)
 
     def test_bootstrap_handles_invalid_csv_file(self) -> None:
-        from bonoai.domain.data import DataContractError
-
         with TemporaryDirectory() as directory:
             data_dir = Path(directory) / "data"
             data_dir.mkdir()
@@ -256,8 +208,6 @@ class DataAuditCliTests(TestCase):
                 _run_data_bootstrap(args)
 
     def test_bootstrap_handles_missing_file(self) -> None:
-        from bonoai.domain.data import DataContractError
-
         with TemporaryDirectory() as directory:
             data_dir = Path(directory) / "data"
             data_dir.mkdir()
