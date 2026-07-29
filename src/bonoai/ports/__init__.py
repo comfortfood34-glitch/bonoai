@@ -1,5 +1,19 @@
 """Dependency inversion contracts."""
 
-from bonoai.ports.draws import DrawRepository, DrawSource
+from bonoai.ports.data import (
+    AppendResult,
+    DrawBatch,
+    DrawRepository,
+    DrawSource,
+    FetchedDocument,
+    RawDocumentArchive,
+)
 
-__all__ = ["DrawRepository", "DrawSource"]
+__all__ = [
+    "AppendResult",
+    "DrawBatch",
+    "DrawRepository",
+    "DrawSource",
+    "FetchedDocument",
+    "RawDocumentArchive",
+]

@@ -34,8 +34,8 @@ class Draw:
     contest_id: str
     held_on: date
     numbers: tuple[int, ...]
-    complementary: int | None = None
-    reintegro: int | None = None
+    complementary: int
+    reintegro: int
 
     def __post_init__(self) -> None:
         if not self.contest_id.strip():
@@ -43,13 +43,12 @@ class Draw:
         canonical = normalize_main_numbers(self.numbers)
         object.__setattr__(self, "numbers", canonical)
 
-        if self.complementary is not None:
-            if not NUMBER_MIN <= self.complementary <= NUMBER_MAX:
-                raise ValueError("complementary must be between 1 and 49")
-            if self.complementary in canonical:
-                raise ValueError("complementary must not repeat a main number")
+        if not NUMBER_MIN <= self.complementary <= NUMBER_MAX:
+            raise ValueError("complementary must be between 1 and 49")
+        if self.complementary in canonical:
+            raise ValueError("complementary must not repeat a main number")
 
-        if self.reintegro is not None and not 0 <= self.reintegro <= 9:
+        if not 0 <= self.reintegro <= 9:
             raise ValueError("reintegro must be between 0 and 9")
 
 

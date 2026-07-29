@@ -40,6 +40,7 @@ class DrawContractTests(TestCase):
                 held_on=date(2026, 1, 1),
                 numbers=(1, 2, 3, 4, 5, 6),
                 complementary=6,
+                reintegro=0,
             )
 
     def test_rejects_empty_contest_id(self) -> None:
@@ -48,6 +49,8 @@ class DrawContractTests(TestCase):
                 contest_id=" ",
                 held_on=date(2026, 1, 1),
                 numbers=(1, 2, 3, 4, 5, 6),
+                complementary=7,
+                reintegro=0,
             )
 
     def test_rejects_invalid_complementary(self) -> None:
@@ -57,6 +60,7 @@ class DrawContractTests(TestCase):
                 held_on=date(2026, 1, 1),
                 numbers=(1, 2, 3, 4, 5, 6),
                 complementary=50,
+                reintegro=0,
             )
 
     def test_rejects_invalid_reintegro(self) -> None:
@@ -65,6 +69,7 @@ class DrawContractTests(TestCase):
                 contest_id="2026-001",
                 held_on=date(2026, 1, 1),
                 numbers=(1, 2, 3, 4, 5, 6),
+                complementary=7,
                 reintegro=10,
             )
 
