@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Leia e cumpra [AGENTS.md](AGENTS.md) antes de modificar o repositório.
+Leia e cumpra [AGENTS.md](AGENTS.md) e [GOVERNANCE.md](GOVERNANCE.md) antes de modificar o repositório.
 
 ## Ordem de contexto
 
