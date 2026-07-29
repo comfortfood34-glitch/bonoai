@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "[pre-commit] Checking tracked file length..."
+python3 scripts/check_file_length.py

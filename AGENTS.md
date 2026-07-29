@@ -2,6 +2,8 @@
 
 Estas regras são obrigatórias para qualquer agente ou contribuidor que altere o BonoAI.
 
+> **Nota importante:** Complementar com [GOVERNANCE.md](GOVERNANCE.md) para guardrails técnicas de repositório (limite de 300 linhas, CI obrigatória, etc).
+
 ## Missão
 
 Construir um pipeline científico, auditável e reproduzível para a Bonoloto. O sistema
