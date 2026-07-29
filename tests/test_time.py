@@ -6,10 +6,14 @@ from bonoai.domain.time import TemporalCutoff
 
 
 def make_draw(contest_id: str, held_on: date, first_number: int) -> Draw:
+    numbers = tuple(range(first_number, first_number + 6))
+    complementary = 49 if 49 not in numbers else 48
     return Draw(
         contest_id=contest_id,
         held_on=held_on,
-        numbers=tuple(range(first_number, first_number + 6)),
+        numbers=numbers,
+        complementary=complementary,
+        reintegro=0,
     )
 
 

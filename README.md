@@ -22,8 +22,17 @@ antes de registrar uma aposta real.
 
 ## Estado atual
 
-A versão `0.1.0` entrega a fundação do domínio, um baseline uniforme reproduzível,
-uma CLI inicial, contratos de produto/dados/tempo/backtesting e testes automatizados.
+A versão `0.2.0` entrega a fundação do domínio, um baseline uniforme reproduzível,
+contratos científicos e a primeira fatia vertical do Marco 1:
+
+- atualização incremental pelo RSS oficial da SELAE;
+- esquema canônico CSV versionado;
+- arquivo bruto imutável com SHA-256 e manifesto;
+- reconciliação atômica, sem “último valor vence”;
+- conflito explícito quando o mesmo concurso apresenta resultados diferentes.
+
+O RSS oficial contém resultados recentes e serve à atualização incremental. O bootstrap
+histórico completo continua sendo uma etapa separada e não é inferido a partir do feed.
 
 ## Começar
 
@@ -33,6 +42,8 @@ Requer Python 3.12 ou superior.
 make setup
 .venv/bin/bonoai info
 .venv/bin/bonoai generate --budget 5.00 --seed 42
+.venv/bin/bonoai data-update
+.venv/bin/bonoai data-status
 make check
 ```
 
@@ -48,6 +59,8 @@ PYTHONPATH=src python3 -m bonoai generate --seed 42
 |---|---|
 | `bonoai info` | Mostra os invariantes operacionais |
 | `bonoai generate` | Gera o baseline uniforme reproduzível |
+| `bonoai data-update` | Arquiva e incorpora resultados recentes da SELAE |
+| `bonoai data-status` | Mostra quantidade e período da base canônica |
 | `make check` | Compila e executa a suíte de testes |
 | `make lint` | Executa o Ruff |
 | `make typecheck` | Executa o mypy em modo estrito |

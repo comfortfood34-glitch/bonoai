@@ -23,6 +23,17 @@ Campos mínimos:
 4. Duplicatas idênticas podem ser consolidadas sem perda de proveniência.
 5. Arquivos brutos são somente leitura depois da ingestão.
 
+## Identidade e atualização oficial
+
+- Identidade estável: `bonoloto:AAAA-MM-DD`.
+- A Bonoloto possui no máximo um resultado por data; uma segunda combinação para a mesma
+  identidade é conflito.
+- O RSS oficial
+  `https://www.loteriasyapuestas.es/es/bonoloto/resultados/.formatoRSS` é usado para
+  atualização incremental.
+- O RSS contém resultados recentes e não substitui o bootstrap histórico.
+- Cada resposta RSS é arquivada byte a byte antes da reconciliação canônica.
+
 ## Qualidade
 
 A ingestão é atômica: ou todo lote validado é promovido, ou nenhum registro é

@@ -9,10 +9,11 @@
 
 ## Marco 1 — Dados
 
-- bootstrap histórico versionado;
-- atualização incremental SELAE;
-- reconciliação entre fontes, hashes e relatórios de conflito;
-- esquema canônico e testes de qualidade.
+- [ ] bootstrap histórico versionado;
+- [x] atualização incremental SELAE;
+- [x] reconciliação, hashes e erro explícito de conflito;
+- [x] esquema canônico e testes de qualidade;
+- [ ] relatório persistente de conflitos entre SELAE e bootstrap auxiliar.
 
 ## Marco 2 — Motor estatístico
 

@@ -6,10 +6,15 @@ import argparse
 import json
 from collections.abc import Sequence
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 
 from bonoai import __version__
+from bonoai.application.ingestion import ingest_draws
 from bonoai.application.portfolio import generate_uniform_portfolio
 from bonoai.domain.models import DEFAULT_BUDGET_EUR, SIMPLE_BET_PRICE_EUR
+from bonoai.infrastructure.csv_repository import CsvDrawRepository
+from bonoai.infrastructure.raw_archive import FilesystemRawArchive
+from bonoai.infrastructure.selae_rss import SelaeRssSource
 
 
 def _decimal(value: str) -> Decimal:
@@ -37,6 +42,21 @@ def build_parser() -> argparse.ArgumentParser:
     generate.add_argument("--unit-price", type=_decimal, default=SIMPLE_BET_PRICE_EUR)
     generate.add_argument("--seed", type=int, default=42)
     generate.add_argument("--json", action="store_true", dest="as_json")
+
+    update = subparsers.add_parser(
+        "data-update",
+        help="arquiva e incorpora resultados novos do RSS oficial da SELAE",
+    )
+    update.add_argument("--data-dir", type=Path, default=Path("data"))
+    update.add_argument("--timeout", type=float, default=20.0)
+    update.add_argument("--json", action="store_true", dest="as_json")
+
+    status = subparsers.add_parser(
+        "data-status",
+        help="mostra o estado do conjunto canônico local",
+    )
+    status.add_argument("--data-dir", type=Path, default=Path("data"))
+    status.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
 
@@ -69,6 +89,49 @@ def _run_generate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _canonical_repository(data_dir: Path) -> CsvDrawRepository:
+    return CsvDrawRepository(data_dir / "processed" / "draws.csv")
+
+
+def _run_data_update(args: argparse.Namespace) -> int:
+    report = ingest_draws(
+        source=SelaeRssSource(timeout_seconds=args.timeout),
+        repository=_canonical_repository(args.data_dir),
+        raw_archive=FilesystemRawArchive(args.data_dir / "raw"),
+    )
+    if args.as_json:
+        print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))
+        return 0
+
+    print(
+        f"SELAE: {report.fetched} lidos, {report.inserted} novos, "
+        f"{report.duplicates} já existentes"
+    )
+    print(f"Base canônica: {report.total} concursos")
+    print(f"Último concurso: {report.latest_draw or 'nenhum'}")
+    print(f"Bruto arquivado em: {report.raw_archive_path}")
+    return 0
+
+
+def _run_data_status(args: argparse.Namespace) -> int:
+    repository = _canonical_repository(args.data_dir)
+    records = repository.list_all()
+    payload = {
+        "canonical_path": str(repository.path),
+        "draw_count": len(records),
+        "first_draw": records[0].draw.held_on.isoformat() if records else None,
+        "last_draw": records[-1].draw.held_on.isoformat() if records else None,
+    }
+    if args.as_json:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+
+    print(f"Base canônica: {payload['canonical_path']}")
+    print(f"Concursos: {payload['draw_count']}")
+    print(f"Período: {payload['first_draw'] or 'vazio'} → {payload['last_draw'] or 'vazio'}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -77,7 +140,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_info()
         if args.command == "generate":
             return _run_generate(args)
-    except (ValueError, RuntimeError) as error:
+        if args.command == "data-update":
+            return _run_data_update(args)
+        if args.command == "data-status":
+            return _run_data_status(args)
+    except (OSError, ValueError, RuntimeError) as error:
         parser.error(str(error))
     parser.error(f"unknown command: {args.command}")  # pragma: no cover
     return 2  # pragma: no cover

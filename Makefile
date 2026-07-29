@@ -1,4 +1,4 @@
-.PHONY: setup test lint typecheck check run clean
+.PHONY: setup test lint typecheck compile coverage check run clean
 
 PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
@@ -8,7 +8,7 @@ setup:
 	.venv/bin/python -m pip install -e ".[dev]"
 
 test:
-	PYTHONPATH=src $(PYTHON) -m unittest discover -s tests -v
+	PYTHONPATH=src $(PYTHON) -m pytest tests
 
 lint:
 	$(PYTHON) -m ruff check .
@@ -16,9 +16,13 @@ lint:
 typecheck:
 	$(PYTHON) -m mypy src tests
 
-check:
+coverage:
+	PYTHONPATH=src $(PYTHON) -m pytest --cov=bonoai --cov-branch --cov-report=term-missing --cov-fail-under=95 tests
+
+check: compile lint typecheck coverage
+
+compile:
 	$(PYTHON) -m compileall -q src tests
-	PYTHONPATH=src $(PYTHON) -m unittest discover -s tests -v
 
 run:
 	PYTHONPATH=src $(PYTHON) -m bonoai info
