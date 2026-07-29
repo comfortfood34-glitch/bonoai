@@ -17,6 +17,7 @@ from bonoai.domain.data import (
     SourceProvenance,
 )
 from bonoai.domain.models import Draw
+from bonoai.infrastructure.migrations import migrate_v1_to_v2
 from bonoai.ports.data import AppendResult
 
 CANONICAL_COLUMNS: Final = (
@@ -34,29 +35,40 @@ CANONICAL_COLUMNS: Final = (
     "source_url",
     "retrieved_at_utc",
     "source_sha256",
+    "source_type",
     "schema_version",
 )
 
 
-def _record_to_row(record: CanonicalDrawRecord) -> dict[str, str]:
+def _record_to_rows(record: CanonicalDrawRecord) -> list[dict[str, str]]:
+    """Expand record into multiple CSV rows (one per provenance)."""
     draw = record.draw
-    provenance = record.provenance
-    row = {
-        "contest_id": draw.contest_id,
-        "held_on": draw.held_on.isoformat(),
-        "complementary": str(draw.complementary),
-        "reintegro": str(draw.reintegro),
-        "source_name": provenance.source_name,
-        "source_url": provenance.source_url,
-        "retrieved_at_utc": provenance.retrieved_at_utc.isoformat(),
-        "source_sha256": provenance.source_sha256,
-        "schema_version": str(provenance.schema_version),
-    }
-    row.update({f"n{index}": str(number) for index, number in enumerate(draw.numbers, start=1)})
-    return row
+    rows = []
+    for provenance in record.provenances:
+        row = {
+            "contest_id": draw.contest_id,
+            "held_on": draw.held_on.isoformat(),
+            "complementary": str(draw.complementary),
+            "reintegro": str(draw.reintegro),
+            "source_name": provenance.source_name,
+            "source_url": provenance.source_url,
+            "retrieved_at_utc": provenance.retrieved_at_utc.isoformat(),
+            "source_sha256": provenance.source_sha256,
+            "source_type": provenance.source_type,
+            "schema_version": str(provenance.schema_version),
+        }
+        row.update({f"n{index}": str(number) for index, number in enumerate(draw.numbers, start=1)})
+        rows.append(row)
+    return rows
 
 
-def _row_to_record(row: dict[str, str], line_number: int) -> CanonicalDrawRecord:
+def _row_to_draw_and_provenance(
+    row: dict[str, str], line_number: int
+) -> tuple[Draw, SourceProvenance]:
+    """Parse CSV row into Draw and SourceProvenance.
+
+    Fail-closed: source_type is mandatory, no defaults.
+    """
     try:
         complementary_str = row["complementary"].strip()
         reintegro_str = row["reintegro"].strip()
@@ -69,16 +81,55 @@ def _row_to_record(row: dict[str, str], line_number: int) -> CanonicalDrawRecord
             complementary=int(complementary_str),
             reintegro=int(reintegro_str),
         )
+        source_type_str = row["source_type"].strip()
+        if not source_type_str:
+            raise ValueError("source_type must not be empty")
+        if source_type_str not in {"official", "auxiliary", "manual"}:
+            raise ValueError(f"invalid source_type: {source_type_str}")
         provenance = SourceProvenance(
             source_name=row["source_name"],
             source_url=row["source_url"],
             retrieved_at_utc=datetime.fromisoformat(row["retrieved_at_utc"]),
             source_sha256=row["source_sha256"],
+            source_type=source_type_str,  # type: ignore
             schema_version=int(row["schema_version"]),
         )
-    except (KeyError, TypeError, ValueError) as error:
+    except KeyError as error:
+        raise DataContractError(
+            f"invalid canonical CSV row at line {line_number}: missing field {error}"
+        ) from error
+    except (TypeError, ValueError) as error:
         raise DataContractError(f"invalid canonical CSV row at line {line_number}") from error
-    return CanonicalDrawRecord(draw=draw, provenance=provenance)
+    return draw, provenance
+
+
+def _rows_to_records(rows: list[dict[str, str]]) -> tuple[CanonicalDrawRecord, ...]:
+    """Group rows by contest_id into CanonicalDrawRecord with multiple provenances.
+
+    Ensures all rows for same contest_id have identical Draw data.
+    """
+    by_contest: dict[str, tuple[Draw, list[SourceProvenance]]] = {}
+
+    for line_number, row in enumerate(rows, start=2):
+        draw, provenance = _row_to_draw_and_provenance(row, line_number)
+        contest_id = draw.contest_id
+
+        if contest_id not in by_contest:
+            by_contest[contest_id] = (draw, [provenance])
+        else:
+            existing_draw, provenances = by_contest[contest_id]
+            if existing_draw != draw:
+                raise DataContractError(
+                    f"canonical CSV has conflicting draws for {contest_id}: "
+                    f"line {line_number} differs from earlier row"
+                )
+            provenances.append(provenance)
+
+    records = tuple(
+        CanonicalDrawRecord(draw=draw, provenances=tuple(provenances))
+        for draw, provenances in by_contest.values()
+    )
+    return records
 
 
 def reconcile_records(
@@ -132,14 +183,17 @@ class CsvDrawRepository:
     def list_all(self) -> tuple[CanonicalDrawRecord, ...]:
         if not self._path.exists():
             return ()
+
+        migrate_v1_to_v2(self._path)
+
         with self._path.open("r", encoding="utf-8", newline="") as stream:
             reader = csv.DictReader(stream)
-            if tuple(reader.fieldnames or ()) != CANONICAL_COLUMNS:
-                raise DataContractError("canonical CSV header does not match schema version 1")
-            records = tuple(
-                _row_to_record(dict(row), line_number)
-                for line_number, row in enumerate(reader, start=2)
-            )
+            fieldnames = tuple(reader.fieldnames or ())
+            if fieldnames != CANONICAL_COLUMNS:
+                raise DataContractError("canonical CSV header does not match schema v2")
+            rows = list(reader)
+
+        records = _rows_to_records([dict(row) for row in rows])
         merged, inserted, duplicates = reconcile_records((), records)
         if inserted != len(records) or duplicates:
             raise DataContractError("canonical CSV contains duplicate contest identifiers")
@@ -169,7 +223,10 @@ class CsvDrawRepository:
                 temporary_path = Path(stream.name)
                 writer = csv.DictWriter(stream, fieldnames=CANONICAL_COLUMNS)
                 writer.writeheader()
-                writer.writerows(_record_to_row(record) for record in merged)
+                all_rows = []
+                for record in merged:
+                    all_rows.extend(_record_to_rows(record))
+                writer.writerows(all_rows)
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(temporary_path, self._path)

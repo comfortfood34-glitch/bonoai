@@ -32,11 +32,15 @@ def make_record(
             complementary=49 if 49 not in numbers else 48,
             reintegro=3,
         ),
-        provenance=SourceProvenance(
-            source_name="selae",
-            source_url="https://example.test/feed",
-            retrieved_at_utc=RETRIEVED_AT,
-            source_sha256="b" * 64,
+        provenances=(
+            SourceProvenance(
+                source_name="selae",
+                source_url="https://www.selae.es/lotobonoloto",
+                retrieved_at_utc=RETRIEVED_AT,
+                source_sha256="b" * 64,
+                source_type="official",
+                schema_version=2,
+            ),
         ),
     )
 
@@ -127,7 +131,8 @@ class CsvDrawRepositoryTests(TestCase):
                     "source_url": "https://example.test/feed",
                     "retrieved_at_utc": "2026-07-29T10:00:00+00:00",
                     "source_sha256": "b" * 64,
-                    "schema_version": "1",
+                    "source_type": "auxiliary",
+                    "schema_version": "2",
                 }
                 writer.writerow(row)
 
@@ -155,12 +160,70 @@ class CsvDrawRepositoryTests(TestCase):
                     "source_url": "https://example.test/feed",
                     "retrieved_at_utc": "2026-07-29T10:00:00+00:00",
                     "source_sha256": "b" * 64,
-                    "schema_version": "1",
+                    "source_type": "auxiliary",
+                    "schema_version": "2",
                 }
                 writer.writerow(row)
 
             with self.assertRaisesRegex(DataContractError, "line 2"):
                 CsvDrawRepository(path).list_all()
+
+    def test_multiple_provenances_same_contest(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "draws.csv"
+            repository = CsvDrawRepository(path)
+
+            official = make_record("same", date(2026, 7, 28), (1, 17, 35, 36, 44, 49))
+            auxiliary = CanonicalDrawRecord(
+                draw=official.draw,
+                provenances=(
+                    official.provenances[0],
+                    SourceProvenance(
+                        source_name="lotoideas",
+                        source_url="https://example.test/historical",
+                        retrieved_at_utc=RETRIEVED_AT,
+                        source_sha256="c" * 64,
+                        source_type="auxiliary",
+                        schema_version=2,
+                    ),
+                ),
+            )
+
+            repository.append_validated((auxiliary,))
+            records = repository.list_all()
+
+            self.assertEqual(len(records), 1)
+            self.assertEqual(len(records[0].provenances), 2)
+            self.assertEqual(records[0].provenances[0].source_type, "official")
+            self.assertEqual(records[0].provenances[1].source_type, "auxiliary")
+
+    def test_round_trip_multiple_provenances(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "draws.csv"
+            repository = CsvDrawRepository(path)
+
+            official = make_record("test", date(2026, 7, 28), (1, 2, 3, 4, 5, 6))
+            auxiliary_provenance = SourceProvenance(
+                source_name="lotoideas",
+                source_url="https://example.test/historical",
+                retrieved_at_utc=RETRIEVED_AT,
+                source_sha256="d" * 64,
+                source_type="auxiliary",
+                schema_version=2,
+            )
+            with_multiple = CanonicalDrawRecord(
+                draw=official.draw,
+                provenances=(*official.provenances, auxiliary_provenance),
+            )
+
+            repository.append_validated((with_multiple,))
+            loaded = repository.list_all()
+
+            self.assertEqual(len(loaded), 1)
+            self.assertEqual(len(loaded[0].provenances), 2)
+            self.assertEqual(loaded[0].draw, official.draw)
+            self.assertEqual(loaded[0].provenances[0].source_name, "selae")
+            self.assertEqual(loaded[0].provenances[1].source_name, "lotoideas")
 
 
 class RawArchiveTests(TestCase):

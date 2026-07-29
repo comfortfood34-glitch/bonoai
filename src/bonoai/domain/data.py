@@ -5,12 +5,12 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Final
+from typing import Final, Literal
 from urllib.parse import urlparse
 
 from bonoai.domain.models import Draw
 
-CANONICAL_SCHEMA_VERSION: Final = 1
+CANONICAL_SCHEMA_VERSION: Final = 2
 SHA256_PATTERN: Final = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -30,6 +30,7 @@ class SourceProvenance:
     source_url: str
     retrieved_at_utc: datetime
     source_sha256: str
+    source_type: Literal["official", "auxiliary", "manual"]
     schema_version: int = CANONICAL_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -56,7 +57,12 @@ class SourceProvenance:
 
 @dataclass(frozen=True, slots=True)
 class CanonicalDrawRecord:
-    """A validated draw bound to its source provenance."""
+    """A validated draw bound to its source provenances."""
 
     draw: Draw
-    provenance: SourceProvenance
+    provenances: tuple[SourceProvenance, ...]
+
+    @property
+    def provenance(self) -> SourceProvenance:
+        """Primary provenance (first in tuple, typically official source)."""
+        return self.provenances[0]

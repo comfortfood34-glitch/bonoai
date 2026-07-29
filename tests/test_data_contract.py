@@ -14,9 +14,10 @@ class SourceProvenanceTests(TestCase):
             source_url="https://www.loteriasyapuestas.es/feed",
             retrieved_at_utc=datetime(2026, 7, 29, 10, 0, tzinfo=UTC),
             source_sha256=SHA256,
+            source_type="official",
         )
 
-        self.assertEqual(provenance.schema_version, 1)
+        self.assertEqual(provenance.schema_version, 2)
 
     def test_rejects_empty_source_name(self) -> None:
         with self.assertRaisesRegex(DataContractError, "source_name"):
@@ -25,6 +26,7 @@ class SourceProvenanceTests(TestCase):
                 source_url="https://example.test/feed",
                 retrieved_at_utc=datetime(2026, 7, 29, tzinfo=UTC),
                 source_sha256=SHA256,
+                source_type="auxiliary",
             )
 
     def test_rejects_relative_source_url(self) -> None:
@@ -34,6 +36,7 @@ class SourceProvenanceTests(TestCase):
                 source_url="/feed",
                 retrieved_at_utc=datetime(2026, 7, 29, tzinfo=UTC),
                 source_sha256=SHA256,
+                source_type="official",
             )
 
     def test_rejects_naive_retrieval_time(self) -> None:
@@ -43,6 +46,7 @@ class SourceProvenanceTests(TestCase):
                 source_url="https://example.test/feed",
                 retrieved_at_utc=datetime(2026, 7, 29),
                 source_sha256=SHA256,
+                source_type="official",
             )
 
     def test_rejects_non_utc_retrieval_time(self) -> None:
@@ -53,6 +57,7 @@ class SourceProvenanceTests(TestCase):
                 source_url="https://example.test/feed",
                 retrieved_at_utc=datetime(2026, 7, 29, tzinfo=madrid_offset),
                 source_sha256=SHA256,
+                source_type="official",
             )
 
     def test_rejects_invalid_hash(self) -> None:
@@ -62,6 +67,7 @@ class SourceProvenanceTests(TestCase):
                 source_url="https://example.test/feed",
                 retrieved_at_utc=datetime(2026, 7, 29, tzinfo=UTC),
                 source_sha256="not-a-hash",
+                source_type="official",
             )
 
     def test_rejects_unknown_schema_version(self) -> None:
@@ -71,7 +77,8 @@ class SourceProvenanceTests(TestCase):
                 source_url="https://example.test/feed",
                 retrieved_at_utc=datetime(2026, 7, 29, tzinfo=UTC),
                 source_sha256=SHA256,
-                schema_version=2,
+                source_type="official",
+                schema_version=1,
             )
 
 
