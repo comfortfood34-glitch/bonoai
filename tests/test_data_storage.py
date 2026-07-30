@@ -54,7 +54,7 @@ class CsvDrawRepositoryTests(TestCase):
 
             result = repository.append_validated((later, earlier))
 
-            self.assertEqual(result.inserted, 2)
+            self.assertEqual(result.inserted_draws, 2)
             self.assertEqual(result.total, 2)
             self.assertEqual(repository.list_all(), (earlier, later))
 
@@ -68,8 +68,8 @@ class CsvDrawRepositoryTests(TestCase):
 
             result = repository.append_validated((record,))
 
-            self.assertEqual(result.duplicates, 1)
-            self.assertEqual(result.inserted, 0)
+            self.assertEqual(result.duplicate_provenances, 1)
+            self.assertEqual(result.inserted_draws, 0)
             self.assertEqual(path.read_bytes(), original_bytes)
 
     def test_conflict_fails_without_mutating_file(self) -> None:
@@ -194,8 +194,8 @@ class CsvDrawRepositoryTests(TestCase):
 
             self.assertEqual(len(records), 1)
             self.assertEqual(len(records[0].provenances), 2)
-            self.assertEqual(records[0].provenances[0].source_type, "official")
-            self.assertEqual(records[0].provenances[1].source_type, "auxiliary")
+            self.assertEqual(records[0].provenances[0].source_type, "auxiliary")
+            self.assertEqual(records[0].provenances[1].source_type, "official")
 
     def test_round_trip_multiple_provenances(self) -> None:
         with TemporaryDirectory() as directory:
@@ -222,8 +222,8 @@ class CsvDrawRepositoryTests(TestCase):
             self.assertEqual(len(loaded), 1)
             self.assertEqual(len(loaded[0].provenances), 2)
             self.assertEqual(loaded[0].draw, official.draw)
-            self.assertEqual(loaded[0].provenances[0].source_name, "selae")
-            self.assertEqual(loaded[0].provenances[1].source_name, "lotoideas")
+            self.assertEqual(loaded[0].provenances[0].source_name, "lotoideas")
+            self.assertEqual(loaded[0].provenances[1].source_name, "selae")
 
 
 class RawArchiveTests(TestCase):

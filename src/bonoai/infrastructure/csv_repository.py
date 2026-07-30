@@ -13,6 +13,7 @@ from typing import Final
 from bonoai.domain.data import (
     CanonicalDrawRecord,
     DataContractError,
+    ReconciliationResult,
     SourceConflictError,
     SourceProvenance,
 )
@@ -107,27 +108,39 @@ def _rows_to_records(rows: list[dict[str, str]]) -> tuple[CanonicalDrawRecord, .
     """Group rows by contest_id into CanonicalDrawRecord with multiple provenances.
 
     Ensures all rows for same contest_id have identical Draw data.
+    Rejects duplicate provenances for the same contest.
     """
-    by_contest: dict[str, tuple[Draw, list[SourceProvenance]]] = {}
+    by_contest: dict[str, tuple[Draw, list[SourceProvenance], set[tuple[str, str, str, str]]]] = {}
 
     for line_number, row in enumerate(rows, start=2):
         draw, provenance = _row_to_draw_and_provenance(row, line_number)
         contest_id = draw.contest_id
 
         if contest_id not in by_contest:
-            by_contest[contest_id] = (draw, [provenance])
+            by_contest[contest_id] = (draw, [provenance], {provenance.fingerprint()})
         else:
-            existing_draw, provenances = by_contest[contest_id]
+            existing_draw, provenances, fingerprints = by_contest[contest_id]
             if existing_draw != draw:
                 raise DataContractError(
                     f"canonical CSV has conflicting draws for {contest_id}: "
                     f"line {line_number} differs from earlier row"
                 )
+            fp = provenance.fingerprint()
+            if fp in fingerprints:
+                raise DataContractError(
+                    f"canonical CSV has duplicate provenance for {contest_id} at line {line_number}"
+                )
             provenances.append(provenance)
+            fingerprints.add(fp)
 
     records = tuple(
-        CanonicalDrawRecord(draw=draw, provenances=tuple(provenances))
-        for draw, provenances in by_contest.values()
+        CanonicalDrawRecord(
+            draw=draw,
+            provenances=tuple(
+                sorted(provenances, key=lambda p: p.fingerprint())
+            ),
+        )
+        for draw, provenances, _ in by_contest.values()
     )
     return records
 
@@ -135,8 +148,8 @@ def _rows_to_records(rows: list[dict[str, str]]) -> tuple[CanonicalDrawRecord, .
 def reconcile_records(
     existing: Iterable[CanonicalDrawRecord],
     incoming: Iterable[CanonicalDrawRecord],
-) -> tuple[tuple[CanonicalDrawRecord, ...], int, int]:
-    """Return a sorted union or raise before any storage mutation."""
+) -> ReconciliationResult:
+    """Return sorted union with metrics."""
     by_contest: dict[str, CanonicalDrawRecord] = {}
     for record in existing:
         previous = by_contest.get(record.draw.contest_id)
@@ -146,15 +159,36 @@ def reconcile_records(
             )
         by_contest[record.draw.contest_id] = record
 
-    inserted = 0
-    duplicates = 0
+    inserted_draws = 0
+    duplicate_provenances = 0
+    added_provenances = 0
+
     for record in incoming:
         previous = by_contest.get(record.draw.contest_id)
         if previous is None:
             by_contest[record.draw.contest_id] = record
-            inserted += 1
+            inserted_draws += 1
         elif previous.draw == record.draw:
-            duplicates += 1
+            existing_fingerprints = {prov.fingerprint() for prov in previous.provenances}
+            new_provenances = []
+            for prov in record.provenances:
+                if prov.fingerprint() not in existing_fingerprints:
+                    new_provenances.append(prov)
+                    added_provenances += 1
+                else:
+                    duplicate_provenances += 1
+
+            if new_provenances:
+                merged_provenances = tuple(
+                    sorted(
+                        (*previous.provenances, *new_provenances),
+                        key=lambda p: p.fingerprint(),
+                    )
+                )
+                by_contest[record.draw.contest_id] = CanonicalDrawRecord(
+                    draw=previous.draw,
+                    provenances=merged_provenances,
+                )
         else:
             raise SourceConflictError(
                 f"conflicting result for {record.draw.contest_id}: "
@@ -167,7 +201,12 @@ def reconcile_records(
             key=lambda record: (record.draw.held_on, record.draw.contest_id),
         )
     )
-    return ordered, inserted, duplicates
+    return ReconciliationResult(
+        records=ordered,
+        inserted_draws=inserted_draws,
+        added_provenances=added_provenances,
+        duplicate_provenances=duplicate_provenances,
+    )
 
 
 class CsvDrawRepository:
@@ -180,11 +219,13 @@ class CsvDrawRepository:
     def path(self) -> Path:
         return self._path
 
+    def migrate_schema(self) -> None:
+        """Explicitly migrate v1 CSV schema to v2. Atomic, idempotent, deterministic."""
+        migrate_v1_to_v2(self._path)
+
     def list_all(self) -> tuple[CanonicalDrawRecord, ...]:
         if not self._path.exists():
             return ()
-
-        migrate_v1_to_v2(self._path)
 
         with self._path.open("r", encoding="utf-8", newline="") as stream:
             reader = csv.DictReader(stream)
@@ -194,19 +235,24 @@ class CsvDrawRepository:
             rows = list(reader)
 
         records = _rows_to_records([dict(row) for row in rows])
-        merged, inserted, duplicates = reconcile_records((), records)
-        if inserted != len(records) or duplicates:
+        result = reconcile_records((), records)
+        if result.inserted_draws != len(records) or result.duplicate_provenances:
             raise DataContractError("canonical CSV contains duplicate contest identifiers")
-        return merged
+        return result.records
 
     def append_validated(
         self,
         records: Sequence[CanonicalDrawRecord],
     ) -> AppendResult:
         current = self.list_all()
-        merged, inserted, duplicates = reconcile_records(current, records)
-        if inserted == 0:
-            return AppendResult(inserted=0, duplicates=duplicates, total=len(merged))
+        result = reconcile_records(current, records)
+        if result.inserted_draws == 0 and result.added_provenances == 0:
+            return AppendResult(
+                inserted_draws=0,
+                added_provenances=0,
+                duplicate_provenances=result.duplicate_provenances,
+                total=len(result.records),
+            )
 
         self._path.parent.mkdir(parents=True, exist_ok=True)
         temporary_path: Path | None = None
@@ -224,7 +270,7 @@ class CsvDrawRepository:
                 writer = csv.DictWriter(stream, fieldnames=CANONICAL_COLUMNS)
                 writer.writeheader()
                 all_rows = []
-                for record in merged:
+                for record in result.records:
                     all_rows.extend(_record_to_rows(record))
                 writer.writerows(all_rows)
                 stream.flush()
@@ -233,4 +279,9 @@ class CsvDrawRepository:
         finally:
             if temporary_path is not None and temporary_path.exists():
                 temporary_path.unlink()
-        return AppendResult(inserted=inserted, duplicates=duplicates, total=len(merged))
+        return AppendResult(
+            inserted_draws=result.inserted_draws,
+            added_provenances=result.added_provenances,
+            duplicate_provenances=result.duplicate_provenances,
+            total=len(result.records),
+        )

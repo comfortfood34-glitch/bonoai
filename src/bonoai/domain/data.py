@@ -23,6 +23,16 @@ class SourceConflictError(DataContractError):
 
 
 @dataclass(frozen=True, slots=True)
+class ReconciliationResult:
+    """Result of reconciling records from multiple sources."""
+
+    records: tuple[CanonicalDrawRecord, ...]
+    inserted_draws: int
+    added_provenances: int
+    duplicate_provenances: int
+
+
+@dataclass(frozen=True, slots=True)
 class SourceProvenance:
     """Minimum audit trail for one external payload."""
 
@@ -54,6 +64,10 @@ class SourceProvenance:
                 f"expected {CANONICAL_SCHEMA_VERSION}"
             )
 
+    def fingerprint(self) -> tuple[str, str, str, str]:
+        """Deterministic identity: (source_type, source_name, source_url, source_sha256)."""
+        return (self.source_type, self.source_name, self.source_url, self.source_sha256)
+
 
 @dataclass(frozen=True, slots=True)
 class CanonicalDrawRecord:
@@ -61,6 +75,21 @@ class CanonicalDrawRecord:
 
     draw: Draw
     provenances: tuple[SourceProvenance, ...]
+
+    def __post_init__(self) -> None:
+        if not self.provenances:
+            raise DataContractError("CanonicalDrawRecord requires at least one provenance")
+        seen_fps = set()
+        for prov in self.provenances:
+            fp = prov.fingerprint()
+            if fp in seen_fps:
+                raise DataContractError(
+                    f"duplicate provenance: {prov.source_name} {prov.source_url}"
+                )
+            seen_fps.add(fp)
+        if len(self.provenances) > 1:
+            sorted_provs = tuple(sorted(self.provenances, key=lambda p: p.fingerprint()))
+            object.__setattr__(self, "provenances", sorted_provs)
 
     @property
     def provenance(self) -> SourceProvenance:

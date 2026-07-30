@@ -45,8 +45,8 @@ def ingest_draws(
     latest = records[-1].draw.held_on if records else None
     return IngestionReport(
         fetched=len(batch.records),
-        inserted=result.inserted,
-        duplicates=result.duplicates,
+        inserted=result.inserted_draws,
+        duplicates=result.duplicate_provenances,
         total=result.total,
         latest_draw=latest,
         raw_archive_path=raw_path,

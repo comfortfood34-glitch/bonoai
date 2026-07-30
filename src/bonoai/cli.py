@@ -10,13 +10,16 @@ from pathlib import Path
 
 from bonoai import __version__
 from bonoai.application.audit import reconcile_sources
+from bonoai.application.audit_models import AuditPolicy
 from bonoai.application.ingestion import ingest_draws
 from bonoai.application.portfolio import generate_uniform_portfolio
-from bonoai.domain.data import DataContractError, SourceConflictError
+from bonoai.cli_migrate import run_data_migrate
+from bonoai.domain.data import DataContractError
 from bonoai.domain.models import DEFAULT_BUDGET_EUR, SIMPLE_BET_PRICE_EUR
 from bonoai.infrastructure.csv_bootstrap import CsvHistoricalSource
 from bonoai.infrastructure.csv_repository import CsvDrawRepository
 from bonoai.infrastructure.raw_archive import FilesystemRawArchive
+from bonoai.infrastructure.raw_payload_reader import FilesystemRawPayloadReader
 from bonoai.infrastructure.selae_rss import SelaeRssSource
 
 
@@ -60,6 +63,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     status.add_argument("--data-dir", type=Path, default=Path("data"))
     status.add_argument("--json", action="store_true", dest="as_json")
+
+    migrate = subparsers.add_parser(
+        "data-migrate",
+        help="migra dados de schema v1 para v2 (idempotente)",
+    )
+    migrate.add_argument("--data-dir", type=Path, default=Path("data"))
+    migrate.add_argument("--json", action="store_true", dest="as_json")
 
     bootstrap = subparsers.add_parser(
         "data-bootstrap",
@@ -152,6 +162,8 @@ def _run_data_status(args: argparse.Namespace) -> int:
     return 0
 
 
+
+
 def _run_data_bootstrap(args: argparse.Namespace) -> int:
     if getattr(args, "url", None):
         import sys
@@ -170,18 +182,21 @@ def _run_data_bootstrap(args: argparse.Namespace) -> int:
     source = CsvHistoricalSource(args.file, source_name=args.source_name)
     records = source.load()
     repository = _canonical_repository(args.data_dir)
-    try:
-        audit = reconcile_sources(repository.list_all(), records)
-    except SourceConflictError as error:
+    audit = reconcile_sources(repository.list_all(), records)
+
+    if audit.has_conflicts():
         parser = build_parser()
-        parser.error(str(error))
+        conflict_ids = [c.contest_id for c in audit.conflicts]
+        msg = f"Found {len(audit.conflicts)} conflicting result(s): {', '.join(conflict_ids)}"
+        parser.error(msg)
 
     result = repository.append_validated(audit.merged_records)
     if args.as_json:
         output = {
             "loaded_from": str(args.file),
-            "inserted": result.inserted,
-            "duplicates": result.duplicates,
+            "inserted_draws": result.inserted_draws,
+            "added_provenances": result.added_provenances,
+            "duplicate_provenances": result.duplicate_provenances,
             "total": result.total,
             "conflicts": len(audit.conflicts),
         }
@@ -189,8 +204,9 @@ def _run_data_bootstrap(args: argparse.Namespace) -> int:
         return 0
 
     print(f"Histórico carregado: {args.file}")
-    print(f"Novos registros: {result.inserted}")
-    print(f"Duplicatas: {result.duplicates}")
+    print(f"Novos concursos: {result.inserted_draws}")
+    print(f"Novas proveniências: {result.added_provenances}")
+    print(f"Proveniências duplicadas: {result.duplicate_provenances}")
     print(f"Total na base: {result.total}")
     return 0
 
@@ -198,13 +214,24 @@ def _run_data_bootstrap(args: argparse.Namespace) -> int:
 def _run_data_audit(args: argparse.Namespace) -> int:
     repository = _canonical_repository(args.data_dir)
     records = repository.list_all()
-    audit = reconcile_sources(records, None)
+    raw_reader = FilesystemRawPayloadReader(args.data_dir / "raw")
+
+    try:
+        audit = reconcile_sources(records, None, raw_reader, AuditPolicy())
+    except RuntimeError as error:
+        import sys
+        print(f"Erro operacional: {error}", file=sys.stderr)
+        return 2
 
     if args.as_json:
-        print(json.dumps(audit.to_dict(), ensure_ascii=False, indent=2))
-        return 0
+        print(json.dumps(audit.to_dict(), ensure_ascii=False, indent=2, sort_keys=True))
+        return audit.exit_code()
 
     print(f"Base canônica: {len(records)} concursos")
+    if audit.findings:
+        print("Achados da auditoria:")
+        for finding in audit.findings:
+            print(f"  [{finding.severity.upper()}] {finding.code}: {finding.message}")
     if audit.conflicts:
         print(f"Conflitos: {len(audit.conflicts)}")
         for conflict in audit.conflicts:
@@ -215,7 +242,7 @@ def _run_data_audit(args: argparse.Namespace) -> int:
             )
     else:
         print("Nenhum conflito encontrado")
-    return 0
+    return audit.exit_code()
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -230,11 +257,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_data_update(args)
         if args.command == "data-status":
             return _run_data_status(args)
+        if args.command == "data-migrate":
+            return run_data_migrate(args)
         if args.command == "data-bootstrap":
             return _run_data_bootstrap(args)
         if args.command == "data-audit":
             return _run_data_audit(args)
-    except (OSError, ValueError, RuntimeError, DataContractError, SourceConflictError) as error:
+    except (OSError, ValueError, RuntimeError, DataContractError) as error:
         parser.error(str(error))
     parser.error(f"unknown command: {args.command}")  # pragma: no cover
     return 2  # pragma: no cover

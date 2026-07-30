@@ -7,29 +7,45 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from bonoai.domain.data import DataContractError
-
-SELAE_OFFICIAL_URL = "https://www.selae.es/lotobonoloto"
+from bonoai.infrastructure.source_allowlist import validate_source
 
 
 def _classify_source_v1_to_v2(source_name: str, source_url: str) -> str:
     """Classify source_type for v1 → v2 migration.
 
-    Returns "official" only for SELAE with official URL.
+    Validates source via allowlist before classification.
+    Returns "official" only for SELAE with allowlist-approved hostname.
     Returns "auxiliary" for known auxiliary sources.
-    Raises DataContractError for unknown sources.
+    Raises DataContractError for unknown sources or allowlist violations.
     """
     source_name_lower = source_name.strip().lower()
 
     if source_name_lower == "selae":
-        if SELAE_OFFICIAL_URL in source_url:
-            return "official"
-        raise DataContractError(
-            f"source_type fail-closed: SELAE with non-official URL "
-            f"cannot be classified: {source_url}"
-        )
+        try:
+            validate_source("official", "selae", source_url)
+        except ValueError as e:
+            raise DataContractError(
+                f"source_type fail-closed: SELAE validation failed: {e}"
+            ) from e
+        return "official"
 
     # Known auxiliary sources
-    if source_name_lower in {"lotoideas", "sorteo-bonoloto"}:
+    if source_name_lower == "lotoideas":
+        try:
+            validate_source("auxiliary", "lotoideas", source_url)
+        except ValueError as e:
+            raise DataContractError(
+                f"source_type fail-closed: Lotoideas validation failed: {e}"
+            ) from e
+        return "auxiliary"
+
+    if source_name_lower == "sorteo-bonoloto":
+        try:
+            validate_source("auxiliary", "sorteo-bonoloto", source_url)
+        except ValueError as e:
+            raise DataContractError(
+                f"source_type fail-closed: sorteo-bonoloto validation failed: {e}"
+            ) from e
         return "auxiliary"
 
     raise DataContractError(

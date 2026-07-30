@@ -77,7 +77,7 @@ class BootstrapIntegrationErrorTests(TestCase):
                     "n6": "49",
                     "complementary": "15",
                     "reintegro": "2",
-                    "source_url": "https://example.test/historical",
+                    "source_url": "https://lotoideas.com/historical",
                 })
 
             args = argparse.Namespace(
@@ -177,11 +177,12 @@ class BootstrapIntegrationErrorTests(TestCase):
                     "complementary": "7",
                     "reintegro": "8",
                     "source_name": "lotoideas",
-                    "source_url": "https://example.test/data",
+                    "source_url": "https://lotoideas.com/data",
                     "retrieved_at_utc": "2026-07-29T10:00:00+00:00",
                     "source_sha256": "b" * 64,
                 })
 
             repository = CsvDrawRepository(path)
+            repository.migrate_schema()
             records = repository.list_all()
             self.assertEqual(len(records), 1)

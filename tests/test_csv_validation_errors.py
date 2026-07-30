@@ -147,5 +147,5 @@ class CsvValidationErrorTests(TestCase):
                     "n2": "17",
                 })
 
-            with self.assertRaisesRegex(DataContractError, "invalid or missing fields"):
+            with self.assertRaisesRegex(DataContractError, "header does not match schema"):
                 CsvDrawRepository(path).list_all()

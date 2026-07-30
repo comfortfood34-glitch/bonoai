@@ -6,7 +6,6 @@ from unittest import TestCase
 from bonoai.application.audit import ConflictRecord, reconcile_sources
 from bonoai.domain.data import (
     CanonicalDrawRecord,
-    SourceConflictError,
     SourceProvenance,
 )
 from bonoai.domain.models import Draw
@@ -90,10 +89,13 @@ class ReconcilationTests(TestCase):
             "bonoloto:2026-07-28", date(2026, 7, 28), (7, 8, 9, 10, 11, 12)
         )]
 
-        with self.assertRaisesRegex(SourceConflictError, "conflicting result"):
-            reconcile_sources(official, auxiliary)
+        audit = reconcile_sources(official, auxiliary)
 
-    def test_ignores_identical_duplicates(self) -> None:
+        self.assertTrue(audit.has_conflicts())
+        self.assertEqual(len(audit.conflicts), 1)
+        self.assertEqual(audit.conflicts[0].contest_id, "bonoloto:2026-07-28")
+
+    def test_unites_identical_draws_with_different_provenances(self) -> None:
         official = [make_official(
             "bonoloto:2026-07-28", date(2026, 7, 28), (1, 2, 3, 4, 5, 6)
         )]
@@ -104,7 +106,8 @@ class ReconcilationTests(TestCase):
         audit = reconcile_sources(official, auxiliary)
 
         self.assertEqual(len(audit.merged_records), 1)
-        self.assertEqual(audit.duplicates_ignored, 1)
+        self.assertEqual(len(audit.merged_records[0].provenances), 2)
+        self.assertEqual(audit.duplicates_ignored, 0)
         self.assertFalse(audit.has_conflicts())
 
     def test_reconcile_with_none_auxiliary(self) -> None:
@@ -171,8 +174,11 @@ class ReconcilationTests(TestCase):
             ),
         )
 
-        with self.assertRaisesRegex(SourceConflictError, "conflicting result"):
-            reconcile_sources(official, [aux1, aux2])
+        audit = reconcile_sources(official, [aux1, aux2])
+
+        self.assertTrue(audit.has_conflicts())
+        self.assertEqual(len(audit.conflicts), 1)
+        self.assertEqual(audit.conflicts[0].contest_id, "bonoloto:2026-07-27")
 
     def test_audit_tracks_all_findings(self) -> None:
         official = [make_official(
