@@ -123,6 +123,7 @@ def parse_selae_rss(
         source_url=source_url,
         retrieved_at_utc=retrieved_at_utc,
         source_sha256=source_sha256,
+        source_type="official",
     )
     try:
         root = ElementTree.fromstring(payload)
@@ -156,7 +157,7 @@ def parse_selae_rss(
                 )
             continue
         by_contest[draw.contest_id] = draw
-        records.append(CanonicalDrawRecord(draw=draw, provenance=provenance))
+        records.append(CanonicalDrawRecord(draw=draw, provenances=(provenance,)))
 
     return tuple(sorted(records, key=lambda record: (record.draw.held_on, record.draw.contest_id)))
 

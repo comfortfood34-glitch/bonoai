@@ -9,11 +9,17 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from bonoai import __version__
+from bonoai.application.audit import reconcile_sources
+from bonoai.application.audit_models import AuditPolicy
 from bonoai.application.ingestion import ingest_draws
 from bonoai.application.portfolio import generate_uniform_portfolio
+from bonoai.cli_migrate import run_data_migrate
+from bonoai.domain.data import DataContractError
 from bonoai.domain.models import DEFAULT_BUDGET_EUR, SIMPLE_BET_PRICE_EUR
+from bonoai.infrastructure.csv_bootstrap import CsvHistoricalSource
 from bonoai.infrastructure.csv_repository import CsvDrawRepository
 from bonoai.infrastructure.raw_archive import FilesystemRawArchive
+from bonoai.infrastructure.raw_payload_reader import FilesystemRawPayloadReader
 from bonoai.infrastructure.selae_rss import SelaeRssSource
 
 
@@ -57,6 +63,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     status.add_argument("--data-dir", type=Path, default=Path("data"))
     status.add_argument("--json", action="store_true", dest="as_json")
+
+    migrate = subparsers.add_parser(
+        "data-migrate",
+        help="migra dados de schema v1 para v2 (idempotente)",
+    )
+    migrate.add_argument("--data-dir", type=Path, default=Path("data"))
+    migrate.add_argument("--json", action="store_true", dest="as_json")
+
+    bootstrap = subparsers.add_parser(
+        "data-bootstrap",
+        help="carrega dados históricos de um arquivo CSV local",
+    )
+    bootstrap.add_argument("--file", type=Path, help="caminho do arquivo CSV")
+    bootstrap.add_argument("--url", type=str, help="(BLOQUEADO) URL remota de fonte histórica")
+    bootstrap.add_argument("--source-name", type=str, default="auxiliary", help="nome da fonte")
+    bootstrap.add_argument("--data-dir", type=Path, default=Path("data"))
+    bootstrap.add_argument("--json", action="store_true", dest="as_json")
+
+    audit = subparsers.add_parser(
+        "data-audit",
+        help="audita e reconcilia fontes de dados",
+    )
+    audit.add_argument("--data-dir", type=Path, default=Path("data"))
+    audit.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
 
@@ -132,6 +162,89 @@ def _run_data_status(args: argparse.Namespace) -> int:
     return 0
 
 
+
+
+def _run_data_bootstrap(args: argparse.Namespace) -> int:
+    if getattr(args, "url", None):
+        import sys
+        print(
+            "ERROR: fonte histórica remota não aprovada: "
+            "implementação de --url bloqueada até aprovação de segurança",
+            file=sys.stderr,
+        )
+        return 2
+
+    if not getattr(args, "file", None):
+        import sys
+        print("ERROR: --file é obrigatório quando --url não é fornecido", file=sys.stderr)
+        return 2
+
+    source = CsvHistoricalSource(args.file, source_name=args.source_name)
+    records = source.load()
+    repository = _canonical_repository(args.data_dir)
+    audit = reconcile_sources(repository.list_all(), records)
+
+    if audit.has_conflicts():
+        parser = build_parser()
+        conflict_ids = [c.contest_id for c in audit.conflicts]
+        msg = f"Found {len(audit.conflicts)} conflicting result(s): {', '.join(conflict_ids)}"
+        parser.error(msg)
+
+    result = repository.append_validated(audit.merged_records)
+    if args.as_json:
+        output = {
+            "loaded_from": str(args.file),
+            "inserted_draws": result.inserted_draws,
+            "added_provenances": result.added_provenances,
+            "duplicate_provenances": result.duplicate_provenances,
+            "total": result.total,
+            "conflicts": len(audit.conflicts),
+        }
+        print(json.dumps(output, ensure_ascii=False, indent=2))
+        return 0
+
+    print(f"Histórico carregado: {args.file}")
+    print(f"Novos concursos: {result.inserted_draws}")
+    print(f"Novas proveniências: {result.added_provenances}")
+    print(f"Proveniências duplicadas: {result.duplicate_provenances}")
+    print(f"Total na base: {result.total}")
+    return 0
+
+
+def _run_data_audit(args: argparse.Namespace) -> int:
+    repository = _canonical_repository(args.data_dir)
+    records = repository.list_all()
+    raw_reader = FilesystemRawPayloadReader(args.data_dir / "raw")
+
+    try:
+        audit = reconcile_sources(records, None, raw_reader, AuditPolicy())
+    except RuntimeError as error:
+        import sys
+        print(f"Erro operacional: {error}", file=sys.stderr)
+        return 2
+
+    if args.as_json:
+        print(json.dumps(audit.to_dict(), ensure_ascii=False, indent=2, sort_keys=True))
+        return audit.exit_code()
+
+    print(f"Base canônica: {len(records)} concursos")
+    if audit.findings:
+        print("Achados da auditoria:")
+        for finding in audit.findings:
+            print(f"  [{finding.severity.upper()}] {finding.code}: {finding.message}")
+    if audit.conflicts:
+        print(f"Conflitos: {len(audit.conflicts)}")
+        for conflict in audit.conflicts:
+            print(
+                f"  {conflict.contest_id}: "
+                f"oficial={conflict.official_numbers}, "
+                f"auxiliar={conflict.auxiliary_numbers}"
+            )
+    else:
+        print("Nenhum conflito encontrado")
+    return audit.exit_code()
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -144,7 +257,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_data_update(args)
         if args.command == "data-status":
             return _run_data_status(args)
-    except (OSError, ValueError, RuntimeError) as error:
+        if args.command == "data-migrate":
+            return run_data_migrate(args)
+        if args.command == "data-bootstrap":
+            return _run_data_bootstrap(args)
+        if args.command == "data-audit":
+            return _run_data_audit(args)
+    except (OSError, ValueError, RuntimeError, DataContractError) as error:
         parser.error(str(error))
     parser.error(f"unknown command: {args.command}")  # pragma: no cover
     return 2  # pragma: no cover

@@ -2,7 +2,7 @@ import argparse
 import contextlib
 import io
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -10,6 +10,9 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from bonoai.cli import _decimal, main
+from bonoai.domain.data import CanonicalDrawRecord, SourceProvenance
+from bonoai.domain.models import Draw
+from bonoai.infrastructure.csv_repository import CsvDrawRepository
 from bonoai.infrastructure.selae_rss import SelaeRssSource
 
 FIXTURE = Path(__file__).parent / "fixtures" / "selae_bonoloto.xml"
@@ -103,3 +106,76 @@ class CliTests(TestCase):
         self.assertEqual(status, 0)
         self.assertEqual(payload["inserted"], 2)
         self.assertEqual(payload["latest_draw"], "2026-07-28")
+
+
+    def test_data_audit_with_findings_text(self) -> None:
+        with TemporaryDirectory() as directory:
+            data_dir = Path(directory) / "data"
+            data_dir.mkdir()
+            (data_dir / "processed").mkdir()
+
+            repo = CsvDrawRepository(data_dir / "processed" / "draws.csv")
+            record = CanonicalDrawRecord(
+                draw=Draw(
+                    contest_id="test:2026-07-27",
+                    held_on=date(2026, 7, 27),
+                    numbers=(1, 2, 3, 4, 5, 6),
+                    complementary=7,
+                    reintegro=8,
+                ),
+                provenances=(
+                    SourceProvenance(
+                        source_name="test",
+                        source_url="https://example.test",
+                        retrieved_at_utc=RETRIEVED_AT,
+                        source_sha256="a" * 64,
+                        source_type="official",
+                        schema_version=2,
+                    ),
+                ),
+            )
+            repo.append_validated((record,))
+
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                status = main(["data-audit", "--data-dir", str(data_dir)])
+
+        self.assertEqual(status, 0)
+        self.assertIn("Base canônica:", output.getvalue())
+
+    def test_data_audit_with_findings_json(self) -> None:
+        with TemporaryDirectory() as directory:
+            data_dir = Path(directory) / "data"
+            data_dir.mkdir()
+            (data_dir / "processed").mkdir()
+
+            repo = CsvDrawRepository(data_dir / "processed" / "draws.csv")
+            record = CanonicalDrawRecord(
+                draw=Draw(
+                    contest_id="test:2026-07-27",
+                    held_on=date(2026, 7, 27),
+                    numbers=(1, 2, 3, 4, 5, 6),
+                    complementary=7,
+                    reintegro=8,
+                ),
+                provenances=(
+                    SourceProvenance(
+                        source_name="test",
+                        source_url="https://example.test",
+                        retrieved_at_utc=RETRIEVED_AT,
+                        source_sha256="a" * 64,
+                        source_type="official",
+                        schema_version=2,
+                    ),
+                ),
+            )
+            repo.append_validated((record,))
+
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                status = main(["data-audit", "--data-dir", str(data_dir), "--json"])
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(status, 0)
+        self.assertEqual(payload["merged_count"], 1)
+        self.assertIsInstance(payload["findings"], list)

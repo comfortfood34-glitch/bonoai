@@ -34,8 +34,9 @@ class DrawBatch:
 class AppendResult:
     """Result of one atomic canonical repository update."""
 
-    inserted: int
-    duplicates: int
+    inserted_draws: int
+    added_provenances: int
+    duplicate_provenances: int
     total: int
 
 
@@ -52,6 +53,18 @@ class RawDocumentArchive(Protocol):
 
     def store(self, document: FetchedDocument) -> Path:
         """Persist exact bytes and a provenance manifest."""
+        ...
+
+
+class RawPayloadReader(Protocol):
+    """Port for reading raw evidence bytes and validating checksums."""
+
+    def read_by_sha256(self, sha256: str) -> bytes | None:
+        """Read raw bytes by SHA-256 digest.
+
+        Returns:
+            bytes if payload found, None if not found.
+        """
         ...
 
 

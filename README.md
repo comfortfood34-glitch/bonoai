@@ -22,14 +22,22 @@ antes de registrar uma aposta real.
 
 ## Estado atual
 
-A versão `0.2.0` entrega a fundação do domínio, um baseline uniforme reproduzível,
-contratos científicos e a primeira fatia vertical do Marco 1:
+A versão `0.2.0` + Marco 2 entrega:
 
-- atualização incremental pelo RSS oficial da SELAE;
-- esquema canônico CSV versionado;
-- arquivo bruto imutável com SHA-256 e manifesto;
-- reconciliação atômica, sem “último valor vence”;
-- conflito explícito quando o mesmo concurso apresenta resultados diferentes.
+- **Marco 1**: fundação de domínio, baseline uniforme, contratos, e primeira fatia vertical.
+  - Atualização incremental pelo RSS oficial da SELAE
+  - Esquema canônico CSV versionado (v1 e v2)
+  - Arquivo bruto imutável com SHA-256 e manifesto
+  - Reconciliação atômica, sem “último valor vence”
+  - Conflito explícito quando o mesmo concurso apresenta resultados diferentes
+
+- **Marco 2**: auditoria completa, migração de schema e validação de proveniância.
+  - Comando `data-migrate`: migração idempotente de v1 → v2 com backup
+  - Auditoria: coleta todos os achados e conflitos, não interrompe
+  - Proveniâncias: validação de unicidade, rejeição de duplicatas, ordenação determinística
+  - Exit codes: 0=sucesso (com avisos), 1=erro nos dados, 2=falha operacional
+  - Distribuição de fontes por tipo (official/auxiliary/manual)
+  - Período e datas extremas no relatório de auditoria
 
 O RSS oficial contém resultados recentes e serve à atualização incremental. O bootstrap
 histórico completo continua sendo uma etapa separada e não é inferido a partir do feed.
@@ -61,6 +69,9 @@ PYTHONPATH=src python3 -m bonoai generate --seed 42
 | `bonoai generate` | Gera o baseline uniforme reproduzível |
 | `bonoai data-update` | Arquiva e incorpora resultados recentes da SELAE |
 | `bonoai data-status` | Mostra quantidade e período da base canônica |
+| `bonoai data-migrate` | Migra dados de schema v1 para v2 (idempotente) |
+| `bonoai data-bootstrap` | Carrega dados históricos de arquivo CSV local |
+| `bonoai data-audit` | Audita e reconcilia fontes de dados |
 | `make check` | Compila e executa a suíte de testes |
 | `make lint` | Executa o Ruff |
 | `make typecheck` | Executa o mypy em modo estrito |

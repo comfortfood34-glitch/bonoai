@@ -2,6 +2,24 @@
 
 Todas as mudanças relevantes serão registradas neste arquivo.
 
+## [Marco 2] - 2026-07-30
+
+### Adicionado
+
+- Comando `data-migrate`: migração atômica de schema v1 → v2 com validação e backup.
+- Auditoria completa: coleta de todos os achados e conflitos sem interrupção.
+- Validação de proveniância: rejeição de duplicatas e ordenação determinística por fingerprint.
+- CanonicalDrawRecord com validação obrigatória de proveniância mínima.
+- Distribuição de fonte por tipo (official/auxiliary/manual) na auditoria.
+- Primeira data e última data do período auditado.
+
+### Corrigido
+
+- Exit codes: 0=ok (com avisos), 1=erro nos dados, 2=erro operacional.
+- Reconciliação não mais lança SourceConflictError; coleta conflitos em audit.conflicts.
+- Auditoria ordena findings e conflicts deterministicamente.
+- Details em AuditFinding como dict estruturado, não string.
+
 ## [0.2.0] - 2026-07-29
 
 ### Adicionado
