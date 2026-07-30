@@ -62,7 +62,7 @@ Mesmo cabeçalho de v1, mas semântica alterada: uma linha por proveniência.
 class CanonicalDrawRecord:
     draw: Draw
     provenances: tuple[SourceProvenance, ...]
-    
+
     @property
     def provenance(self) -> SourceProvenance:
         """Proveniência primária (primeira, geralmente official)."""
