@@ -35,9 +35,9 @@ class TestBaselineStrategiesEdgeCases(TestCase):
             source_url="https://test.com",
             retrieved_at_utc=datetime.now(UTC),
             source_sha256="a" * 64,
-            source_type="official",
+            
         )
-        return CanonicalDrawRecord(draw=draw, provenances=(provenance,))
+        return CanonicalDrawRecord(draw=draw, provenance=provenance,))
 
     def test_frequency_only_with_very_few_unique_numbers(self) -> None:
         """Frequency strategy with only 3 unique numbers (need 6)."""

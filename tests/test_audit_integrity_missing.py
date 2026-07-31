@@ -26,9 +26,9 @@ class TestAuditIntegrityMissing(TestCase):
             source_url="https://test.com",
             retrieved_at_utc=datetime.now(UTC),
             source_sha256="a" * 64,
-            source_type="official",
+            
         )
-        return CanonicalDrawRecord(draw=draw, provenances=(provenance,))
+        return CanonicalDrawRecord(draw=draw, provenance=provenance,))
 
     def test_unknown_schema_version(self) -> None:
         """Check provenance with unknown schema version."""

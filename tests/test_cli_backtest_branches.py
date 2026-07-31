@@ -135,14 +135,14 @@ class TestCliBacktestBranches(TestCase):
                 complementary=7,
                 reintegro=0,
             ),
-            provenances=(
+            provenance=
                 SourceProvenance(
                     source_name="test",
                     source_url="https://test.local",
                     retrieved_at_utc=retrieved_at,
                     source_sha256="a" * 64,
-                    source_type="official",
-                    schema_version=2,
+                    
+                    
                 ),
             ),
         )
@@ -189,14 +189,14 @@ class TestCliBacktestBranches(TestCase):
                     complementary=7,
                     reintegro=0,
                 ),
-                provenances=(
+                provenance=
                     SourceProvenance(
                         source_name="test",
                         source_url="https://test.local",
                         retrieved_at_utc=retrieved_at,
                         source_sha256="a" * 64,
-                        source_type="official",
-                        schema_version=2,
+                        
+                        
                     ),
                 ),
             )
