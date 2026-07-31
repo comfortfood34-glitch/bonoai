@@ -29,11 +29,16 @@
 - [ ] lacunas suspeitas na série temporal;
 - [ ] histórico de migração com rollback.
 
-## Marco 3 — Motor estatístico
+## Marco 3 — Backtesting científico com walk-forward
 
-- frequências nas janelas 10, 20, 50, 100 e 300;
-- atraso, intervalos, tendência e dispersão;
-- features de concurso separadas de features disponíveis antes do sorteio.
+- [x] walk-forward determinístico sem vazamento temporal;
+- [x] run_id canônico derivado de todos os parâmetros de config;
+- [x] artefatos reproduzíveis: 6 arquivos + manifesto com SHA-256;
+- [x] estratégias puras sem ML (uniform_random, frequency_only, delay_only);
+- [x] CLI: `bonoai backtest run/list/show/compare/verify`;
+- [x] intervalo de confiança normalizado a [0,1];
+- [ ] read-only para históricos precedentes;
+- [ ] exportação de resultados para análise externa.
 
 ## Marco 4 — Motor estatístico
 
@@ -41,26 +46,20 @@
 - atraso, intervalos, tendência e dispersão;
 - features de concurso separadas de features disponíveis antes do sorteio.
 
-## Marco 5 — Backtesting antes de ML
-
-- walk-forward com janela expansiva;
-- baselines uniforme e frequência;
-- métricas pareadas e controles negativos.
-
-## Marco 6 — Modelos candidatos
+## Marco 5 — Modelos candidatos
 
 - Random Forest, XGBoost, LightGBM e CatBoost como hipóteses;
 - calibração, seleção interna e registro de experimentos;
 - modelo reprovado nunca entra automaticamente no ensemble.
 
-## Marco 7 — Otimizador
+## Marco 6 — Otimizador
 
 - geração eficiente e com limite de memória;
 - filtros documentados como organização, não vantagem matemática;
 - diversidade com garantia de dez apostas ou falha explícita;
 - perfis smoke, research e certification.
 
-## Marco 8 — Produto
+## Marco 7 — Produto
 
 - relatórios e dashboard;
 - execução agendada somente após validação;

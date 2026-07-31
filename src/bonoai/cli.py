@@ -13,6 +13,7 @@ from bonoai.application.audit import reconcile_sources
 from bonoai.application.audit_models import AuditPolicy
 from bonoai.application.ingestion import ingest_draws
 from bonoai.application.portfolio import generate_uniform_portfolio
+from bonoai.cli_backtest import run_backtest_command
 from bonoai.cli_migrate import run_data_migrate
 from bonoai.domain.data import DataContractError
 from bonoai.domain.models import DEFAULT_BUDGET_EUR, SIMPLE_BET_PRICE_EUR
@@ -87,6 +88,41 @@ def build_parser() -> argparse.ArgumentParser:
     )
     audit.add_argument("--data-dir", type=Path, default=Path("data"))
     audit.add_argument("--json", action="store_true", dest="as_json")
+
+    backtest = subparsers.add_parser("backtest", help="walk-forward validation")
+    backtest_subparsers = backtest.add_subparsers(dest="backtest_command", required=True)
+    backtest_run = backtest_subparsers.add_parser("run", help="executa walk-forward")
+    backtest_run.add_argument(
+        "--strategy", type=str, required=True,
+        choices=[
+            "uniform_random", "frequency_only", "delay_only", "mixed_frequency_delay"
+        ],
+    )
+    backtest_run.add_argument("--start-date", type=str, required=True)
+    backtest_run.add_argument("--end-date", type=str, required=True)
+    backtest_run.add_argument("--training-window", type=int, default=360)
+    backtest_run.add_argument("--seed", type=int, default=42)
+    backtest_run.add_argument("--data-dir", type=Path, default=Path("data"))
+    backtest_run.add_argument("--artifacts-dir", type=Path, default=Path("backtests/runs"))
+    backtest_run.add_argument("--json", action="store_true", dest="as_json")
+
+    backtest_list = backtest_subparsers.add_parser("list", help="lista execuções")
+    backtest_list.add_argument("--artifacts-dir", type=Path, default=Path("backtests/runs"))
+    backtest_list.add_argument("--json", action="store_true", dest="as_json")
+    backtest_show = backtest_subparsers.add_parser("show", help="mostra resultado")
+    backtest_show.add_argument("run_id", type=str, help="run_id")
+    backtest_show.add_argument("--artifacts-dir", type=Path, default=Path("backtests/runs"))
+    backtest_show.add_argument("--json", action="store_true", dest="as_json")
+    backtest_compare = backtest_subparsers.add_parser("compare", help="compara runs")
+    backtest_compare.add_argument("run_id_1", type=str)
+    backtest_compare.add_argument("run_id_2", type=str)
+    backtest_compare.add_argument("--artifacts-dir", type=Path, default=Path("backtests/runs"))
+    backtest_compare.add_argument("--json", action="store_true", dest="as_json")
+    backtest_verify = backtest_subparsers.add_parser("verify", help="verifica integridade")
+    backtest_verify.add_argument("run_id", type=str, help="run_id")
+    backtest_verify.add_argument("--artifacts-dir", type=Path, default=Path("backtests/runs"))
+    backtest_verify.add_argument("--json", action="store_true", dest="as_json")
+
     return parser
 
 
@@ -155,13 +191,10 @@ def _run_data_status(args: argparse.Namespace) -> int:
     if args.as_json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
-
     print(f"Base canônica: {payload['canonical_path']}")
     print(f"Concursos: {payload['draw_count']}")
     print(f"Período: {payload['first_draw'] or 'vazio'} → {payload['last_draw'] or 'vazio'}")
     return 0
-
-
 
 
 def _run_data_bootstrap(args: argparse.Namespace) -> int:
@@ -263,7 +296,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_data_bootstrap(args)
         if args.command == "data-audit":
             return _run_data_audit(args)
+        if args.command == "backtest":
+            return run_backtest_command(args)
     except (OSError, ValueError, RuntimeError, DataContractError) as error:
         parser.error(str(error))
-    parser.error(f"unknown command: {args.command}")  # pragma: no cover
-    return 2  # pragma: no cover
+    parser.error(f"unknown command: {args.command}")
+    return 2

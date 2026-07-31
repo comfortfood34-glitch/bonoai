@@ -39,6 +39,15 @@ A versão `0.2.0` + Marco 2 entrega:
   - Distribuição de fontes por tipo (official/auxiliary/manual)
   - Período e datas extremas no relatório de auditoria
 
+- **Marco 3**: backtesting científico com validação walk-forward e integridade temporal.
+  - Walk-forward determinístico: cada concurso-alvo é avaliado com dados apenas anteriores
+  - run_id canônico: derivado deterministicamente de todos os parâmetros de configuração
+  - Artefatos reproduzíveis: 6 arquivos + manifesto com SHA-256 para auditoria
+  - Estratégias sem ML: implementações puras sem XGBoost, LightGBM, RandomForest ou ensemble
+  - CLI: `bonoai backtest run/list/show/compare/verify` com exit codes 0=sucesso, 1=inválido, 2=erro
+  - Intervalo de confiança: normalizado a [0,1] baseado em média de acertos
+  - Nenhum vazamento temporal: `TemporalLeakageDetected` detecta dados futuros na treining
+
 O RSS oficial contém resultados recentes e serve à atualização incremental. O bootstrap
 histórico completo continua sendo uma etapa separada e não é inferido a partir do feed.
 
@@ -72,6 +81,11 @@ PYTHONPATH=src python3 -m bonoai generate --seed 42
 | `bonoai data-migrate` | Migra dados de schema v1 para v2 (idempotente) |
 | `bonoai data-bootstrap` | Carrega dados históricos de arquivo CSV local |
 | `bonoai data-audit` | Audita e reconcilia fontes de dados |
+| `bonoai backtest run` | Executa backtesting walk-forward determinístico |
+| `bonoai backtest list` | Lista todas as execuções de backtest |
+| `bonoai backtest show` | Mostra resultados detalhados de um backtest |
+| `bonoai backtest compare` | Compara métricas entre dois backtests |
+| `bonoai backtest verify` | Verifica integridade SHA-256 dos artefatos |
 | `make check` | Compila e executa a suíte de testes |
 | `make lint` | Executa o Ruff |
 | `make typecheck` | Executa o mypy em modo estrito |
