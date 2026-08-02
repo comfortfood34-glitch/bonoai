@@ -2,6 +2,25 @@
 
 Todas as mudanças relevantes serão registradas neste arquivo.
 
+## [Marco 3] - 2026-07-30
+
+### Adicionado
+
+- Backtesting walk-forward com integridade temporal (TemporalLeakageDetected).
+- run_id canônico: derivação determinística de SHA-256 sobre todos os parâmetros de config.
+- Estrutura de artefatos: 6 arquivos + manifesto (config, metrics, draw_results, tickets, warnings, manifest).
+- Escrita atômica de artefatos com fsync + os.replace para crash-safety.
+- CLI `bonoai backtest` com subcomandos: run, list, show, compare, verify.
+- Estratégias determinísticas puras (sem ML): uniform_random, frequency_only, delay_only, mixed_frequency_delay.
+- Intervalo de confiança normalizado a [0,1] com suporte a múltiplas métricas.
+- Exit codes padronizados: 0=sucesso, 1=validação falhou, 2=erro operacional.
+
+### Corrigido
+
+- Nenhum vazamento temporal em walk-forward: validação rigorosa de datas e janelas.
+- Determinismo completo: idempotência de artefatos para mesma configuração.
+- Sem ML components: XGBoost, LightGBM, RandomForest, ensemble explicitamente excluídos.
+
 ## [Marco 2] - 2026-07-30
 
 ### Adicionado
