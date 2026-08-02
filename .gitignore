@@ -24,3 +24,13 @@ backtests/runs/*
 .env.*
 !.env.example
 .DS_Store
+
+# Marco 3 review and demonstration artifacts
+/dashboard_screenshot.png
+/marco3_review_*.patch
+/marco3_review_*.zip
+/MARCO3_COMPLETION_SUMMARY.md
+/MARCO3_VALIDATION*.txt
+/marco3_*.png
+/marco3_visual_guide.html
+/MARCO3_VISUALIZATION_REPORT.md
