@@ -1,0 +1,13 @@
+{
+  "completed_at_utc": "2025-12-31T23:59:59Z",
+  "run_id": "demo_run_001",
+  "sha256_inventory": {
+    "config.json": "3584ef229c80bc8f257660eb236d22a6f817a582a02060f669636c5969362f38",
+    "draw_results.csv": "5a5110db289b56866a10683ac02519ad72cc6b235085c763ffddd7f0f8061f84",
+    "metrics.json": "9e35156b3eec9dfd96312c8057ca1cce2fcaa8bdffc951cc56c52055ff9f6d0c",
+    "tickets.csv": "e66741bc57726412d227fba9d9e3c0697406892fbfa0454d73c498a71d237f36",
+    "warnings.json": "c4edee9831fdc004697063e113cd899af444d591627a559b779138a42cc93ea0"
+  },
+  "started_at_utc": "2025-01-01T00:00:00Z",
+  "status": "success"
+}

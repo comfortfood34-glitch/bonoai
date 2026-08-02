@@ -30,20 +30,45 @@ def load_run_data(run_dir: Path) -> dict[str, Any] | None:
     return _load(run_dir)
 
 
+def _resolve_artifacts_dir() -> tuple[Path, bool]:
+    """Resolve artifacts directory with fallback hierarchy.
+
+    Returns (path, is_demo) where is_demo indicates if using demo data.
+    Priority: env var → backtests/runs → examples/demo_backtests
+    """
+    env_dir = os.environ.get("BONOAI_BACKTEST_RUNS_DIR")
+    if env_dir:
+        return Path(env_dir), False
+
+    local_runs = Path("backtests/runs")
+    if local_runs.exists() and any(local_runs.glob("*/manifest.json")):
+        return local_runs, False
+
+    demo_runs = Path("examples/demo_backtests")
+    if demo_runs.exists():
+        return demo_runs, True
+
+    return local_runs, False
+
+
 def main(artifacts_dir: str = "backtests/runs") -> None:
     """Dashboard main entry point - Streamlit UI only."""
     if st is None:
         raise ImportError("Streamlit required for dashboard; install with: pip install streamlit")
 
-    env_artifacts_dir = os.environ.get("BONOAI_BACKTEST_RUNS_DIR")
-    final_artifacts_dir = env_artifacts_dir if env_artifacts_dir else artifacts_dir
+    artifacts_path, is_demo = _resolve_artifacts_dir()
 
     st.set_page_config(page_title="BonoAI Backtest Dashboard", layout="wide")
     st.title("🎰 BonoAI Backtest Results")
     st.markdown("Walk-forward validation without temporal leakage")
     st.markdown("---")
 
-    artifacts_path = Path(final_artifacts_dir)
+    if is_demo:
+        warning_msg = (
+            "⚠️ MODO DEMONSTRAÇÃO — dados sintéticos, "
+            "não correspondem a resultados oficiais da Bonoloto."
+        )
+        st.warning(warning_msg)
 
     run_ids = list_runs(artifacts_path)
     if not run_ids:
