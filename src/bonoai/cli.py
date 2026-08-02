@@ -133,7 +133,6 @@ def _run_info() -> int:
     print("Postura: análise e backtesting; nenhuma promessa de previsão")
     return 0
 
-
 def _run_generate(args: argparse.Namespace) -> int:
     run = generate_uniform_portfolio(
         budget_eur=args.budget,
@@ -157,7 +156,6 @@ def _run_generate(args: argparse.Namespace) -> int:
 
 def _canonical_repository(data_dir: Path) -> CsvDrawRepository:
     return CsvDrawRepository(data_dir / "processed" / "draws.csv")
-
 
 def _run_data_update(args: argparse.Namespace) -> int:
     report = ingest_draws(
@@ -200,16 +198,11 @@ def _run_data_status(args: argparse.Namespace) -> int:
 def _run_data_bootstrap(args: argparse.Namespace) -> int:
     if getattr(args, "url", None):
         import sys
-        print(
-            "ERROR: fonte histórica remota não aprovada: "
-            "implementação de --url bloqueada até aprovação de segurança",
-            file=sys.stderr,
-        )
+        print("ERROR: fonte histórica remota não aprovada: --url bloqueada", file=sys.stderr)
         return 2
-
     if not getattr(args, "file", None):
         import sys
-        print("ERROR: --file é obrigatório quando --url não é fornecido", file=sys.stderr)
+        print("ERROR: --file é obrigatório", file=sys.stderr)
         return 2
 
     source = CsvHistoricalSource(args.file, source_name=args.source_name)

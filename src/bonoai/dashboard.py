@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -14,7 +15,7 @@ from bonoai.application.dashboard_viewmodel import (
 )
 
 if TYPE_CHECKING:
-    import streamlit as st  # type: ignore[import-not-found]
+    import streamlit as st
 else:
     try:
         import streamlit as st  # type: ignore[import-not-found]
@@ -34,12 +35,15 @@ def main(artifacts_dir: str = "backtests/runs") -> None:
     if st is None:
         raise ImportError("Streamlit required for dashboard; install with: pip install streamlit")
 
+    env_artifacts_dir = os.environ.get("BONOAI_BACKTEST_RUNS_DIR")
+    final_artifacts_dir = env_artifacts_dir if env_artifacts_dir else artifacts_dir
+
     st.set_page_config(page_title="BonoAI Backtest Dashboard", layout="wide")
     st.title("🎰 BonoAI Backtest Results")
     st.markdown("Walk-forward validation without temporal leakage")
     st.markdown("---")
 
-    artifacts_path = Path(artifacts_dir)
+    artifacts_path = Path(final_artifacts_dir)
 
     run_ids = list_runs(artifacts_path)
     if not run_ids:
