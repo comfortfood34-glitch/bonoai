@@ -1,0 +1,10 @@
+{
+  "code_commit_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "dataset_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "end_date": "2025-12-31",
+  "random_seed": 42,
+  "start_date": "2025-01-01",
+  "strategy_name": "uniform_random",
+  "tickets_per_draw": 10,
+  "training_window_days": 360
+}

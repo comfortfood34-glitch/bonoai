@@ -90,6 +90,37 @@ PYTHONPATH=src python3 -m bonoai generate --seed 42
 | `make lint` | Executa o Ruff |
 | `make typecheck` | Executa o mypy em modo estrito |
 
+## Dashboard
+
+Dashboard Streamlit para visualização de resultados de backtesting.
+
+### Execução Local
+
+**Com dados de demonstração:**
+```bash
+streamlit run src/bonoai/dashboard.py
+```
+Exibe automaticamente um banner: "MODO DEMONSTRAÇÃO — dados sintéticos, não correspondem a resultados oficiais da Bonoloto."
+
+**Com dados reais:**
+```bash
+export BONOAI_BACKTEST_RUNS_DIR=/caminho/para/backtests/runs
+streamlit run src/bonoai/dashboard.py
+```
+
+### Prioridade de Dados
+
+O dashboard busca dados nesta ordem:
+1. `$BONOAI_BACKTEST_RUNS_DIR` (variável de ambiente)
+2. `backtests/runs/` (dados locais reais)
+3. `examples/demo_backtests/` (dados de demonstração)
+
+Quando usando dados de demonstração, um banner amarelo permanente aparece na parte superior.
+
+### Deploy Público (Streamlit Community Cloud)
+
+Ver [docs/DASHBOARD.md](docs/DASHBOARD.md) para instruções detalhadas de deployment.
+
 ## Arquitetura e governança
 
 - [AGENTS.md](AGENTS.md): regras obrigatórias para agentes e contribuidores.
