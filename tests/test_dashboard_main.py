@@ -45,8 +45,12 @@ class TestDashboardMainFunction(TestCase):
             "bonoai.dashboard._resolve_artifacts_dir",
             return_value=(Path("examples/demo_backtests"), True),
         )
+        mock_list_runs = patch(
+            "bonoai.dashboard.list_runs",
+            return_value=["run_001"],
+        )
 
-        with mock_st as st_mock, mock_resolve:
+        with mock_st as st_mock, mock_resolve, mock_list_runs:
             st_mock.selectbox.return_value = None
             main()
             st_mock.warning.assert_called_once()
@@ -63,8 +67,12 @@ class TestDashboardMainFunction(TestCase):
             "bonoai.dashboard._resolve_artifacts_dir",
             return_value=(Path("backtests/runs"), False),
         )
+        mock_list_runs = patch(
+            "bonoai.dashboard.list_runs",
+            return_value=["run_001"],
+        )
 
-        with mock_st as st_mock, mock_resolve:
+        with mock_st as st_mock, mock_resolve, mock_list_runs:
             st_mock.selectbox.return_value = None
             main()
             st_mock.warning.assert_not_called()
